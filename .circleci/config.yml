@@ -40,7 +40,7 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - run:
-          name: Back-end build
+          name: Back-end test
           command: |
             cd frontend
             npm install
@@ -51,7 +51,7 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - run:
-          name: Back-end build
+          name: Back-end test
           command: |
             cd backend
             npm install
@@ -62,7 +62,7 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - run:
-          name: Front-end build
+          name: Front-end scan
           command: |
             cd frontend
             npm install
@@ -73,7 +73,7 @@ jobs:
       - image: circleci/node:13.8.0
     steps:
       - run:
-          name: Back-end build
+          name: Back-end scan
           command: |
             cd frontend
             npm install
