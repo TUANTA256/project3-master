@@ -231,8 +231,8 @@ jobs:
           name: Run migrations
           command: |
             cd backend
-            npm cache clean --force
             npm install
+            npm audit fix --audit-level=critical --force
             npm run migrations > migrations.txt
             cat migrations.txt
       - run:
@@ -339,7 +339,15 @@ workflows:
             - deploy-infrastructure
       - run-migrations:
           requires:
-            - configure-infrastructure         
+            - test-backend
+            - test-frontend
+            - scan-backend
+            - scan-frontend
+            - configure-infrastructure
+          filters:
+            branches:
+              only:
+                - master   
       - deploy-backend:
           requires:
             - run-migrations
