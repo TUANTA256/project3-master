@@ -44,7 +44,7 @@ jobs:
           command: |
             cd frontend
             npm install
-            npm run build
+            npm run test
                 
   test-backend:
     docker:
@@ -55,7 +55,7 @@ jobs:
           command: |
             cd backend
             npm install
-            npm run build
+            npm run test
 
 workflows:
   default:
