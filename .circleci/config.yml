@@ -229,10 +229,12 @@ jobs:
             sudo ./aws/install
       - run:
           name: Run migrations
-          working_directory: ./backend
+          no_output_timeout: 7m
           command: |
-            npm install
-            npm run migrations > migration_status.txt
+            cd backend
+            npm cache clean --force
+            npm install typescript
+            npm run migrations > migrations_dump.txt
       - run:
           name: Send migration results to kvdb
           working_directory: ./backend
