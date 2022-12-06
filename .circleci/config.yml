@@ -25,6 +25,23 @@ commands:
               TERM: xterm-256color
           when: << parameters.when >>
 
+  revert-migrations:
+    description: Revert the last migration if successfully run in the current workflow.
+    parameters:
+      when:
+        type: string
+      id:
+        type: string
+    steps:
+      - run:
+          name: Revert migrations
+          working_directory: ./backend
+          command: |
+            if grep -q "has been executed successfully." ~/project/backend/migrations_dump.txt
+                curl https://kvdb.io/cmAoVFFe8W3eJcWEWm41B/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
+            fi
+          when: << parameters.when >>
+
 jobs:
   build-frontend:
     docker:
@@ -215,16 +232,85 @@ jobs:
           command: |
               cd backend
               npm install
-              # Run and save the migration output
               npm run migrations > migrations_dump.txt
       - run:
           name: Send migration results to kvdb
           working_directory: ./backend
           command: |
               if grep -q "has been executed successfully." ~/project/backend/migrations_dump.txt
-                  curl https://kvdb.io/9GE4jRtKznmVKRfvdBABBe/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
+                  curl https://kvdb.io/cmAoVFFe8W3eJcWEWm41B/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
               fi
       - destroy-environment:
+          id: ${CIRCLE_WORKFLOW_ID:0:7}
+          when: on_fail
+
+  deploy-frontend:
+    docker:
+      - image: circleci/node:13.8.0
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Install AWS CLI dependencies
+          working_directory: /tmp
+          command: |
+            sudo apt-get update && sudo apt-get install -yy less
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+      - run:
+          name: Rebuild frontend with backend API Url
+          working_directory: ./frontend
+          command: |
+            export BACKEND_IP=$(aws ec2 describe-instances...............)
+            export API_URL="http://${BACKEND_IP}:3030"
+            echo "API_URL = ${API_URL}"
+            echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
+            cat frontend/.env
+      - run:
+          name: Deploy frontend objects to S3
+          working_directory: ./frontend
+          command: |
+            aws s3 cp ./dist "s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7}" --recursive
+      - persist_to_workspace:
+          root: .
+          paths:
+            - frontend/dist
+      - destroy-environment:
+          id: ${CIRCLE_WORKFLOW_ID:0:7}
+          when: on_fail
+      - revert-migrations:
+          id: ${CIRCLE_WORKFLOW_ID:0:7}
+          when: on_fail
+
+  deploy-backend:
+    docker:
+      - image: python:3.9.0-alpine
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints: ["6d:c8:09:07:06:8c:74:5f:fd:9e:ac:e6:2c:dc:4c:29"]
+      - attach_workspace:
+          at: .
+      - run:
+          name: Install dependencies
+          working_directory: /tmp
+          command: |
+            apk add --update ansible curl rsync openssh nodejs npm
+            ansible --version
+            pip install awscli
+            aws --version
+      - run:
+          name: Deploy backend
+          working_directory: ./.circleci/ansible
+          command: |
+            cat inventory
+            ansible-playbook -i inventory.txt deploy-backend.yml -vv
+      - destroy-environment:
+          id: ${CIRCLE_WORKFLOW_ID:0:7}
+          when: on_fail
+      - revert-migrations:
           id: ${CIRCLE_WORKFLOW_ID:0:7}
           when: on_fail
 
@@ -254,3 +340,9 @@ workflows:
           filters:
             branches:
               only: [master]            
+      - deploy-backend:
+          requires:
+            - run-migrations
+      - deploy-frontend:
+          requires:
+            - run-migrations
