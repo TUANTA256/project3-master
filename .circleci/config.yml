@@ -244,6 +244,34 @@ jobs:
           id: ${CIRCLE_WORKFLOW_ID:0:7}
           when: on_fail
 
+  get-aws-params:
+    docker:
+      - image: amazon/aws-cli:2.8.12
+    steps:
+      - checkout
+      - run: yum install -y tar gzip
+      - run:
+          name: Get AWS params
+          command: |
+            export vpcId=$(aws ec2 describe-vpcs \
+              --query Vpcs[0].VpcId --output text)
+            export subnetId=$(aws ec2 describe-subnets \
+              --filter Name=vpc-id,Values=$vpcId --output text \
+              --query Subnets[0].SubnetId)
+            export az=$(aws ec2 describe-subnets \
+              --filter Name=vpc-id,Values=$vpcId --output text \
+              --query Subnets[0].AvailabilityZone)
+            # Write values to env
+            echo vpc-id=$vpcId > ~/project/infra.env
+            echo subnet-id=$subnetId >> ~/project/infra.env
+            echo az=$az >> ~/project/infra.env
+            echo image=ami-061dbd1209944525c >> ~/project/infra.env
+            cat ~/project/infra.env
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - project/infra.env
+
   deploy-database:
     docker:
       - image: amazon/aws-cli:2.8.12
@@ -357,8 +385,19 @@ workflows:
       - configure-infrastructure:
           requires:
             - deploy-infrastructure
+      - get-aws-params:
+          filters:
+            branches:
+              only: [master]
+      - deploy-database:
+          requires: [get-aws-params]
+          filters:
+            branches:
+              only: [master]
       - run-migrations:
-          requires: [deploy-database, configure-infrastructure]          
+          requires:
+            - deploy-database
+            - configure-infrastructure         
       - deploy-backend:
           requires:
             - run-migrations
