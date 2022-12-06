@@ -43,11 +43,11 @@ jobs:
       - restore_cache:
           keys: [frontend-build]
       - run:
-          name: Build front-end
+          name: Test front-end
           command: |
             cd frontend
             npm install
-            npm run build
+            npm run test
       - save_cache:
           paths: [frontend/node_modules]
           key: frontend-build
@@ -60,11 +60,11 @@ jobs:
       - restore_cache:
           keys: [backend-build]
       - run:
-          name: Build backend-end
+          name: Test backend-end
           command: |
             cd backend
             npm install
-            npm run build
+            npm run test
       - save_cache:
           paths: [backend/node_modules]
           key: backend-build
